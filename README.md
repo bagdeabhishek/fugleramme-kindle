@@ -118,10 +118,14 @@ cp examples/kindle-fugleramme/config.sh \
 For a KMC/KPM launcher, also copy the document scriptlet:
 
 ```bash
-cp examples/kindle-fugleramme/Fugleramme.sh \
+cp examples/kindle-fugleramme/kmc-launcher.sh \
    "/media/$USER/Kindle/documents/Fugleramme.sh"
 sync
 ```
+
+Do not put a capitalized `Fugleramme.sh` in the extension directory. Kindle
+storage is case-insensitive, so it would overwrite the actual
+`fugleramme.sh` client.
 
 Safely unmount the Kindle before removing the cable.
 
@@ -196,6 +200,12 @@ Runtime data and logs are stored under:
 /mnt/us/extensions/fugleramme/state/
 ```
 
+`launcher.log` records KUAL startup, stale PID handling, and early exits.
+`fugleramme.log` records the client PID, termination signal, power-management
+result, downloads, and framebuffer updates. If the USB storage is read-only,
+the launcher uses `/tmp/fugleramme/` and also writes both streams to the Kindle
+system log with the `fugleramme` tag.
+
 Force the next cycle to redraw by clearing the cached token:
 
 ```sh
@@ -239,8 +249,13 @@ at the cost of additional battery use.
 Inspect the client log:
 
 ```sh
+tail -n 100 /mnt/us/extensions/fugleramme/state/launcher.log
 tail -n 100 /mnt/us/extensions/fugleramme/state/fugleramme.log
 ```
+
+If those files did not change, inspect `/tmp/fugleramme/` and the Kindle system
+log. A read-only or unavailable `/mnt/us` can prevent KUAL from loading the
+extension at all.
 
 Then confirm the Kindle can reach the server URL and that the configured resolution is
 numeric.

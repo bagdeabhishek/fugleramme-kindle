@@ -6,17 +6,17 @@
         {
           "name": "Start frame",
           "action": "/mnt/us/extensions/fugleramme/start.sh",
-          "exitmenu": false
+          "exitmenu": true
         },
         {
           "name": "Refresh once",
           "action": "/mnt/us/extensions/fugleramme/refresh.sh",
-          "exitmenu": false
+          "exitmenu": true
         },
         {
           "name": "Stop frame",
           "action": "/mnt/us/extensions/fugleramme/stop.sh",
-          "exitmenu": false
+          "exitmenu": true
         }
       ]
     }

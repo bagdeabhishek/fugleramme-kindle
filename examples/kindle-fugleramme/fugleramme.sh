@@ -12,6 +12,7 @@ FUGLERAMME_URL=${FUGLERAMME_URL:-}
 KINDLE_WIDTH=${KINDLE_WIDTH:-}
 KINDLE_HEIGHT=${KINDLE_HEIGHT:-}
 INTERVAL_SECONDS=${INTERVAL_SECONDS:-300}
+START_DELAY_SECONDS=${START_DELAY_SECONDS:-5}
 MANAGE_WIFI=${MANAGE_WIFI:-1}
 WIFI_WAIT_SECONDS=${WIFI_WAIT_SECONDS:-30}
 SUSPEND_MODE=${SUSPEND_MODE:-auto}
@@ -21,16 +22,21 @@ FREEZE_KINDLE_UI=${FREEZE_KINDLE_UI:-0}
 UI_FROZEN=0
 
 STATE="$DIR/state"
+RUNTIME=${FUGLERAMME_RUNTIME:-$STATE}
 FRAME="$STATE/frame.png"
 VERSION="$STATE/version"
-LOG="$STATE/fugleramme.log"
+LOG="$RUNTIME/fugleramme.log"
+PID_FILE=${FUGLERAMME_PID_FILE:-"$RUNTIME/client.pid"}
 ONCE=0
 [ "${1:-}" = "--once" ] && ONCE=1
+STOP_REASON=normal
 
-mkdir -p "$STATE"
+mkdir -p "$STATE" "$RUNTIME"
 
 log() {
-    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG"
+    line="$(date '+%Y-%m-%d %H:%M:%S') client $$ $*"
+    printf '%s\n' "$line" >> "$LOG" 2>/dev/null || true
+    command -v logger >/dev/null 2>&1 && logger -t fugleramme "$line" 2>/dev/null || true
 }
 
 fail_config() {
@@ -67,11 +73,11 @@ download() {
     url=$1
     target=$2
     if command -v curl >/dev/null 2>&1; then
-        curl -fsS --connect-timeout 10 --max-time 90 -o "$target" "$url"
+        curl -fsS --connect-timeout 10 --max-time 90 -o "$target" "$url" 2>> "$LOG"
         return
     fi
     if command -v wget >/dev/null 2>&1; then
-        wget -q -O "$target" "$url"
+        wget -q -O "$target" "$url" 2>> "$LOG"
         return
     fi
     return 127
@@ -117,6 +123,7 @@ refresh() {
     current=""
     [ -r "$VERSION" ] && current=$(cat "$VERSION")
     if [ "$remote" = "$current" ] && [ -s "$FRAME" ]; then
+        log "Frame unchanged at $remote"
         return 0
     fi
 
@@ -148,10 +155,18 @@ find_rtcwake() {
     [ -x /usr/sbin/rtcwake ] && printf '%s\n' /usr/sbin/rtcwake
 }
 
+ordinary_sleep() {
+    remaining=$INTERVAL_SECONDS
+    while [ "$remaining" -gt 0 ]; do
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+}
+
 pause_until_next_check() {
-    [ "$SUSPEND_MODE" != 0 ] || { sleep "$INTERVAL_SECONDS"; return; }
+    [ "$SUSPEND_MODE" != 0 ] || { ordinary_sleep; return; }
     rtcwake=$(find_rtcwake)
-    [ -n "$rtcwake" ] || { sleep "$INTERVAL_SECONDS"; return; }
+    [ -n "$rtcwake" ] || { ordinary_sleep; return; }
     device=$RTC_DEVICE
     if [ -z "$device" ]; then
         [ -e /dev/rtc1 ] && device=/dev/rtc1 || device=/dev/rtc0
@@ -159,7 +174,7 @@ pause_until_next_check() {
     sync
     if ! "$rtcwake" -d "$device" -m mem -s "$INTERVAL_SECONDS" >> "$LOG" 2>&1; then
         log "rtcwake failed on $device; using an ordinary sleep"
-        sleep "$INTERVAL_SECONDS"
+        ordinary_sleep
     fi
 }
 
@@ -171,6 +186,7 @@ restore_kindle_ui() {
         lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home >/dev/null 2>&1 || true
     }
     UI_FROZEN=0
+    log "Restored the Kindle UI"
 }
 
 freeze_kindle_ui() {
@@ -180,22 +196,48 @@ freeze_kindle_ui() {
     if command -v killall >/dev/null 2>&1 && killall -STOP awesome >/dev/null 2>&1; then
         UI_FROZEN=1
         log "Paused the Kindle UI"
+    else
+        log "Could not pause the Kindle UI"
     fi
 }
 
 cleanup() {
+    status=$?
+    trap - EXIT
+    log "Stopping with status $status ($STOP_REASON)"
     wifi_on
     restore_kindle_ui
     command -v lipc-set-prop >/dev/null 2>&1 && \
         lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
-    [ "$ONCE" = 1 ] || rm -f "$STATE/client.pid"
+    [ "$ONCE" = 1 ] || rm -f "$PID_FILE"
+    exit "$status"
 }
-trap cleanup EXIT
-trap 'exit 0' INT TERM
-trap '' HUP
 
-command -v lipc-set-prop >/dev/null 2>&1 && \
-    lipc-set-prop com.lab126.powerd preventScreenSaver 1 >/dev/null 2>&1 || true
+stopped() {
+    signal=$1
+    status=$2
+    STOP_REASON="signal $signal"
+    log "Received $signal"
+    exit "$status"
+}
+
+trap cleanup EXIT
+# HUP is deliberately ignored because KUAL closes after launching the client.
+trap '' HUP
+trap 'stopped INT 130' INT
+trap 'stopped TERM 143' TERM
+
+log "Starting; parent=${PPID:-unknown} url=$FUGLERAMME_URL size=${KINDLE_WIDTH}x${KINDLE_HEIGHT} interval=${INTERVAL_SECONDS}s runtime=$RUNTIME"
+sleep "$START_DELAY_SECONDS"
+if command -v lipc-set-prop >/dev/null 2>&1; then
+    if lipc-set-prop com.lab126.powerd preventScreenSaver 1 >/dev/null 2>&1; then
+        log "Prevented the native screen saver"
+    else
+        log "Could not prevent the native screen saver"
+    fi
+else
+    log "lipc-set-prop is unavailable; native power management remains active"
+fi
 freeze_kindle_ui
 
 while :; do

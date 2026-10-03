@@ -337,14 +337,22 @@ Expected properties include `1072 x 1448` and `8-bit grayscale`.
 ### Inspect the Kindle log
 
 ```sh
+tail -n 100 /mnt/us/extensions/fugleramme/state/launcher.log
 tail -n 100 /mnt/us/extensions/fugleramme/state/fugleramme.log
 ```
+
+When the user storage cannot be written, the runtime files fall back to
+`/tmp/fugleramme/`. The launcher and client also use the system logger with the
+tag `fugleramme`. This fallback helps diagnose a newly read-only filesystem, but
+KUAL cannot start the extension when `/mnt/us` is unavailable altogether.
 
 Typical useful messages include:
 
 ```text
 Paused the Kindle UI
 Displayed frame <version>
+Received TERM
+Stopping with status 143 (signal TERM)
 Version check failed; keeping the current screen
 Frame download failed; keeping the current screen
 FBInk could not display the downloaded frame
@@ -367,6 +375,8 @@ LXC.
 | No image and version check failures | Wi-Fi or server unreachable | Check radio, LAN, and `192.168.1.80` |
 | Frame flashes, then Home returns | Native Kindle UI was not frozen | Confirm `FREEZE_KINDLE_UI=1` |
 | Frame never updates | Cached token unchanged or client not running | Inspect PID/log; clear `state/version` |
+| KUAL closes and the client stops | Client shared KUAL's process session | Confirm `setsid` is present; inspect `launcher.log` |
+| Logs do not change | User storage is read-only or the extension never launched | Inspect `/tmp/fugleramme`, system log, and filesystem state |
 | `FBInk not found` | Configured binary moved or is not executable | Check `/mnt/us/libkh/bin/fbink` |
 | Kindle UI remains paused after stopping | Cleanup was interrupted | Run `stop.sh` or restart the Kindle |
 | USB volume becomes read-only | Filesystem error or unreliable cable | Safely unmount; inspect host logs; repair only with approval |
@@ -409,10 +419,14 @@ mkdir -p /media/abhishek/Kindle/extensions/fugleramme
 cp outputs/kindle-device-fugleramme/*.sh \
    outputs/kindle-device-fugleramme/menu.json \
    /media/abhishek/Kindle/extensions/fugleramme/
-cp work/fugleramme/examples/kindle-fugleramme/Fugleramme.sh \
+cp work/fugleramme/examples/kindle-fugleramme/kmc-launcher.sh \
    /media/abhishek/Kindle/documents/Fugleramme.sh
 sync
 ```
+
+The source and destination names intentionally differ. FAT is
+case-insensitive; `Fugleramme.sh` inside the extension directory would
+overwrite its `fugleramme.sh` client.
 
 Then safely unmount before removing the cable:
 

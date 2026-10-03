@@ -1,12 +1,16 @@
 #!/bin/sh
 DIR=$(CDPATH='' cd "$(dirname "$0")" && pwd)
-PID_FILE="$DIR/state/client.pid"
+STATE="$DIR/state"
 
-if [ -r "$PID_FILE" ]; then
-    pid=$(cat "$PID_FILE")
-    kill "$pid" 2>/dev/null || true
+for PID_FILE in "$STATE/client.pid" /tmp/fugleramme/client.pid; do
+    pid=""
+    [ -s "$PID_FILE" ] && pid=$(tr -d '\r\n' < "$PID_FILE")
+    case "$pid" in
+        *[!0-9]* | "") ;;
+        *) kill "$pid" 2>/dev/null || true ;;
+    esac
     rm -f "$PID_FILE"
-fi
+done
 command -v killall >/dev/null 2>&1 && killall -CONT awesome >/dev/null 2>&1 || true
 command -v lipc-set-prop >/dev/null 2>&1 && {
     lipc-set-prop com.lab126.pillow disableEnablePillow enable >/dev/null 2>&1 || true

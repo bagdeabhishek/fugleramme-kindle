@@ -54,9 +54,11 @@ Make the launchers executable, disconnect USB storage, open KUAL, and choose
 chmod +x /mnt/us/extensions/fugleramme/*.sh
 ```
 
-On KMC/KPM-based jailbreaks, also copy `Fugleramme.sh` to
-`/mnt/us/documents/Fugleramme.sh`. After disconnecting USB and refreshing the
-library, launch the **Fugleramme** document from the Kindle home screen.
+On KMC/KPM-based jailbreaks, also copy `kmc-launcher.sh` to
+`/mnt/us/documents/Fugleramme.sh`. Do not put that capitalized destination in
+the extension folder: Kindle storage is case-insensitive and it would
+overwrite the `fugleramme.sh` client. After disconnecting USB and refreshing
+the library, launch the **Fugleramme** document from the Kindle home screen.
 
 The default interval is five minutes. Wi-Fi is enabled only for each check.
 The launcher waits five seconds before the first draw so the Kindle home screen
@@ -74,8 +76,11 @@ on your model.
 
 **Stop frame** restores the normal screensaver and leaves the last picture on
 the display. Logs, the cached frame and the last version are under
-`/mnt/us/extensions/fugleramme/state/`. Delete `state/version` to force the next
-check to download and redraw the page.
+`/mnt/us/extensions/fugleramme/state/`. `launcher.log` covers KUAL startup and
+PID handling; `fugleramme.log` covers signals, power management, downloads, and
+FBInk. If that directory is read-only, runtime logs and the PID fall back to
+`/tmp/fugleramme/` and messages are also sent to the system logger. Delete
+`state/version` to force the next check to download and redraw the page.
 
 ## On HDMI, Raspberry Pi OS Desktop
 
