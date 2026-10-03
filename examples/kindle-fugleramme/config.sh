@@ -19,6 +19,14 @@ START_DELAY_SECONDS=${START_DELAY_SECONDS:-5}
 # 1 to pause that UI while Fugleramme runs; stop.sh restores it.
 FREEZE_KINDLE_UI=${FREEZE_KINDLE_UI:-0}
 
+# keep leaves the existing light alone. off saves the current setting and turns
+# the LEDs off while the frame runs. fixed uses FRONTLIGHT_LEVEL (0 to 24 on
+# many Kindles). Stop and normal client exit restore the saved setting.
+FRONTLIGHT_MODE=${FRONTLIGHT_MODE:-keep}
+FRONTLIGHT_LEVEL=${FRONTLIGHT_LEVEL:-5}
+# Optional override. Blank auto-detects the Kindle backlight brightness node.
+FRONTLIGHT_SYSFS=${FRONTLIGHT_SYSFS:-}
+
 # 1 toggles Wi-Fi around each check. Set to 0 if another service manages it.
 MANAGE_WIFI=${MANAGE_WIFI:-1}
 WIFI_WAIT_SECONDS=${WIFI_WAIT_SECONDS:-30}

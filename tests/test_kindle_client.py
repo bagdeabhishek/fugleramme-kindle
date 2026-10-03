@@ -21,3 +21,15 @@ def test_kual_closes_after_launching_each_action():
 def test_the_kmc_launcher_starts_the_extension_client():
     launcher = (CLIENT / "kmc-launcher.sh").read_text()
     assert "/mnt/us/extensions/fugleramme/start.sh" in launcher
+
+
+def test_frontlight_changes_are_saved_and_restored():
+    client = (CLIENT / "fugleramme.sh").read_text()
+    stop = (CLIENT / "stop.sh").read_text()
+
+    assert "FRONTLIGHT_MODE=${FRONTLIGHT_MODE:-keep}" in client
+    assert "frontlight.lipc" in client
+    assert "frontlight.sysfs" in client
+    assert "restore_frontlight" in client
+    assert "frontlight.lipc" in stop
+    assert "frontlight.sysfs" in stop

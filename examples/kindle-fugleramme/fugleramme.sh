@@ -19,7 +19,11 @@ SUSPEND_MODE=${SUSPEND_MODE:-auto}
 RTC_DEVICE=${RTC_DEVICE:-}
 FBINK=${FBINK:-}
 FREEZE_KINDLE_UI=${FREEZE_KINDLE_UI:-0}
+FRONTLIGHT_MODE=${FRONTLIGHT_MODE:-keep}
+FRONTLIGHT_LEVEL=${FRONTLIGHT_LEVEL:-5}
+FRONTLIGHT_SYSFS=${FRONTLIGHT_SYSFS:-}
 UI_FROZEN=0
+FRONTLIGHT_CHANGED=0
 
 STATE="$DIR/state"
 RUNTIME=${FUGLERAMME_RUNTIME:-$STATE}
@@ -52,6 +56,13 @@ case "$KINDLE_HEIGHT" in
 esac
 case "$INTERVAL_SECONDS" in
     *[!0-9]* | "" | 0) fail_config "INTERVAL_SECONDS must be a positive integer" ;;
+esac
+case "$FRONTLIGHT_MODE" in
+    keep | off | fixed) ;;
+    *) fail_config "FRONTLIGHT_MODE must be keep, off, or fixed" ;;
+esac
+case "$FRONTLIGHT_LEVEL" in
+    *[!0-9]* | "") fail_config "FRONTLIGHT_LEVEL must be a non-negative integer" ;;
 esac
 [ -n "$FUGLERAMME_URL" ] || fail_config "Set FUGLERAMME_URL in config.sh"
 FUGLERAMME_URL=${FUGLERAMME_URL%/}
@@ -201,11 +212,83 @@ freeze_kindle_ui() {
     fi
 }
 
+find_frontlight_sysfs() {
+    if [ -n "$FRONTLIGHT_SYSFS" ] && [ -e "$FRONTLIGHT_SYSFS" ]; then
+        printf '%s\n' "$FRONTLIGHT_SYSFS"
+        return
+    fi
+    for candidate in \
+        /sys/class/backlight/max77696-bl/brightness \
+        /sys/devices/system/fl_tps6116x/fl_tps6116x0/fl_intensity \
+        /sys/class/backlight/*/brightness; do
+        [ -e "$candidate" ] && { printf '%s\n' "$candidate"; return; }
+    done
+}
+
+save_frontlight() {
+    [ "$FRONTLIGHT_MODE" != keep ] || return 0
+    if [ ! -e "$RUNTIME/frontlight.lipc" ] && command -v lipc-get-prop >/dev/null 2>&1; then
+        lipc-get-prop -i com.lab126.powerd flIntensity \
+            > "$RUNTIME/frontlight.lipc" 2>/dev/null || rm -f "$RUNTIME/frontlight.lipc"
+    fi
+    node=$(find_frontlight_sysfs)
+    if [ ! -e "$RUNTIME/frontlight.sysfs" ] && [ -n "$node" ] && [ -r "$node" ]; then
+        cat "$node" > "$RUNTIME/frontlight.sysfs" 2>/dev/null || true
+        printf '%s\n' "$node" > "$RUNTIME/frontlight.path" 2>/dev/null || true
+    fi
+}
+
+set_frontlight() {
+    [ "$FRONTLIGHT_MODE" != keep ] || return 0
+    save_frontlight
+    level=$FRONTLIGHT_LEVEL
+    [ "$FRONTLIGHT_MODE" = off ] && level=0
+    if command -v lipc-set-prop >/dev/null 2>&1; then
+        lipc-set-prop -i com.lab126.powerd flIntensity "$level" >/dev/null 2>&1 || \
+            log "Could not set frontlight through powerd"
+    fi
+    # Older Kindles, including the Paperwhite 3, may leave the LEDs faintly on
+    # when powerd is set to zero. KOReader also writes zero to the backlight node.
+    if [ "$level" = 0 ]; then
+        node=$(find_frontlight_sysfs)
+        [ -n "$node" ] && printf '0\n' > "$node" 2>/dev/null || true
+    fi
+    FRONTLIGHT_CHANGED=1
+    log "Set frontlight mode=$FRONTLIGHT_MODE level=$level"
+}
+
+restore_frontlight() {
+    [ "$FRONTLIGHT_CHANGED" = 1 ] || return 0
+    if [ -s "$RUNTIME/frontlight.lipc" ] && command -v lipc-set-prop >/dev/null 2>&1; then
+        saved=$(tr -d '\r\n' < "$RUNTIME/frontlight.lipc")
+        case "$saved" in
+            *[!0-9]* | "") ;;
+            *) lipc-set-prop -i com.lab126.powerd flIntensity "$saved" >/dev/null 2>&1 || true ;;
+        esac
+    fi
+    if [ -s "$RUNTIME/frontlight.path" ] && [ -s "$RUNTIME/frontlight.sysfs" ]; then
+        node=$(tr -d '\r\n' < "$RUNTIME/frontlight.path")
+        saved=$(tr -d '\r\n' < "$RUNTIME/frontlight.sysfs")
+        case "$saved" in
+            *[!0-9]* | "") ;;
+            *) case "$node" in
+                /sys/class/backlight/* | /sys/devices/system/fl_tps6116x/fl_tps6116x0/fl_intensity)
+                    printf '%s\n' "$saved" > "$node" 2>/dev/null || true
+                    ;;
+            esac ;;
+        esac
+    fi
+    rm -f "$RUNTIME/frontlight.lipc" "$RUNTIME/frontlight.sysfs" "$RUNTIME/frontlight.path"
+    FRONTLIGHT_CHANGED=0
+    log "Restored the previous frontlight setting"
+}
+
 cleanup() {
     status=$?
     trap - EXIT
     log "Stopping with status $status ($STOP_REASON)"
     wifi_on
+    restore_frontlight
     restore_kindle_ui
     command -v lipc-set-prop >/dev/null 2>&1 && \
         lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
@@ -239,6 +322,7 @@ else
     log "lipc-set-prop is unavailable; native power management remains active"
 fi
 freeze_kindle_ui
+set_frontlight
 
 while :; do
     wifi_on

@@ -3,6 +3,21 @@
 Fugleramme serves the collage over HTTP, so it can show on more than the e-ink
 panel. Five ways, easiest first.
 
+## In KOReader on Kobo or Kindle
+
+The portable plugin at `examples/koreader-fugleramme/fugleramme.koplugin` uses
+KOReader's own network, image, input, and screen APIs. It reads the current screen
+dimensions and selects a colour profile automatically, including Kobo Libra Colour.
+
+Install it in `.adds/koreader/plugins/` on Kobo or `koreader/plugins/` on Kindle,
+restart KOReader, and use **Tools > Fugleramme frame** to set the server URL and open
+the frame. Tap to refresh immediately and hold to close. The five-minute default can
+be changed from the same menu. The last successful frame remains visible through a
+temporary network failure.
+
+This path needs only KOReader. It does not need FBInk, a KUAL entry, or a hardcoded
+resolution. KOReader remains responsible for frontlight and power controls.
+
 ## From another device
 
 Open `http://<host>.local:8080/` on a phone, tablet or laptop on the same
@@ -68,6 +83,10 @@ If the stock Kindle interface still paints over the image, set
 `FREEZE_KINDLE_UI=1`. This uses the same reversible window-manager pause as
 KOReader. **Stop frame** resumes the UI; a forced Kindle restart also restores
 it if the client is interrupted unexpectedly.
+Set `FRONTLIGHT_MODE=off` to turn the LEDs off while the shell client runs, or
+`FRONTLIGHT_MODE=fixed` with `FRONTLIGHT_LEVEL` for a fixed level. The client saves
+and restores the previous value, and **Stop frame** has an independent restoration
+path.
 The script uses `rtcwake` and `/dev/rtc1` when they are available, then falls
 back to an ordinary sleep if suspend is unavailable. Kindle RTC devices vary by
 model. Test first with `SUSPEND_MODE=0`; once fetching and FBInk work, change it

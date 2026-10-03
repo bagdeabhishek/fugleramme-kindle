@@ -214,6 +214,40 @@ def test_the_kindle_routes_refuse_an_unsafe_or_incomplete_size(frame, query):
         assert b"width and height" in body
 
 
+@pytest.mark.parametrize(
+    "profile, mode", [("grayscale", "L"), ("color", "RGB"), ("kaleido3", "RGB")]
+)
+def test_display_profiles_render_an_exact_page(frame, profile, mode):
+    query = f"?width=632&height=840&profile={profile}"
+    status, headers, body = _fetch(frame + "/display/frame.png" + query)
+    image = Image.open(io.BytesIO(body))
+
+    assert status == 200
+    assert headers["Content-Type"] == "image/png"
+    assert image.size == (632, 840)
+    assert image.mode == mode
+
+
+def test_display_version_includes_the_output_profile(frame):
+    base = frame + "/display/version?width=632&height=840&profile="
+    versions = {
+        profile: _fetch(base + profile)[2] for profile in ("grayscale", "color", "kaleido3")
+    }
+
+    assert all(re.fullmatch(rb"[0-9a-f]{16}\n", version) for version in versions.values())
+    assert len(set(versions.values())) == 3
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["?width=632&height=840", "?width=632&height=840&profile=unknown", "?profile=color"],
+)
+def test_display_routes_refuse_an_invalid_request(frame, query):
+    for route in ("/display/frame.png", "/display/version"):
+        status, _headers, _body = _fetch(frame + route + query)
+        assert status == 400
+
+
 def test_the_preview_reads_an_unsaved_form_without_saving_it(frame, tmp_path):
     saved = json.loads(_fetch(frame + "/species")[2])
     edited = json.loads(_fetch(frame + "/species?mode=latest")[2])
@@ -347,6 +381,8 @@ def test_every_route_is_either_the_kiosk_or_behind_the_password(tmp_path, source
         "/admin.css",
         "/admin.js",
         "/collage.png",
+        "/display/frame.png",
+        "/display/version",
         "/kindle/frame.png",
         "/kindle/version",
         "/state",

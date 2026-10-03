@@ -57,9 +57,10 @@ REQUEST_TIMEOUT = 15
 
 HTML = "text/html; charset=utf-8"
 JSON = "application/json"
-KINDLE_MIN_SIDE = 320
-KINDLE_MAX_SIDE = 4096
-KINDLE_MAX_PIXELS = 10_000_000
+DISPLAY_MIN_SIDE = 320
+DISPLAY_MAX_SIDE = 4096
+DISPLAY_MAX_PIXELS = 10_000_000
+DISPLAY_PROFILES = frozenset({"grayscale", "color", "kaleido3"})
 
 # What a password covers (#52). The kiosk stays open whatever is set: it is the
 # product, and the demo page and the container's healthcheck read it as strangers.
@@ -321,9 +322,13 @@ def make_handler(
                 panel=settings.web_lock and attached is not None,
             )
 
-        def _kindle_context(self) -> modes.Context | None:
-            """The normal page at a Kindle-owned size. The client names both
-            sides because Kindle models and orientations do not share a resolution."""
+        def _display_context(self) -> modes.Context | None:
+            """The normal page at a display-owned size.
+
+            E-readers name both sides because models and orientations do not
+            share a resolution. The server validates the requested canvas before
+            asking the renderer to allocate it.
+            """
             query = self._query()
             try:
                 width = int(query.get("width", [""])[0])
@@ -331,9 +336,9 @@ def make_handler(
             except ValueError:
                 width = height = 0
             valid = (
-                KINDLE_MIN_SIDE <= width <= KINDLE_MAX_SIDE
-                and KINDLE_MIN_SIDE <= height <= KINDLE_MAX_SIDE
-                and width * height <= KINDLE_MAX_PIXELS
+                DISPLAY_MIN_SIDE <= width <= DISPLAY_MAX_SIDE
+                and DISPLAY_MIN_SIDE <= height <= DISPLAY_MAX_SIDE
+                and width * height <= DISPLAY_MAX_PIXELS
             )
             if not valid:
                 self._send(
@@ -351,6 +356,17 @@ def make_handler(
                 namer(settings.primary_language, settings.secondary_language, store.path.parent),
                 (width, height),
             )
+
+        def _display_profile(self) -> str | None:
+            profile = self._query().get("profile", [""])[0]
+            if profile not in DISPLAY_PROFILES:
+                self._send(
+                    400,
+                    b"profile must be grayscale, color, or kaleido3",
+                    "text/plain",
+                )
+                return None
+            return profile
 
         def _edited(self) -> Settings:
             """Saved settings under the admin's unsaved form state, so the
@@ -381,14 +397,14 @@ def make_handler(
             self._send(200, json.dumps({"token": token}).encode(), JSON)
 
         def _kindle_version(self):
-            ctx = self._kindle_context()
+            ctx = self._display_context()
             if ctx is None:
                 return
             version = modes.token(modes.state_key(ctx))
             self._send(200, f"{version}\n".encode(), "text/plain")
 
         def _kindle_png(self):
-            ctx = self._kindle_context()
+            ctx = self._display_context()
             if ctx is None:
                 return
             # Render through the shared page cache, then make the wire image
@@ -397,6 +413,31 @@ def make_handler(
             output = io.BytesIO()
             page.save(output, format="PNG", optimize=True)
             self._send_cached(output.getvalue(), "image/png")
+
+        def _display_version(self):
+            ctx = self._display_context()
+            if ctx is None:
+                return
+            profile = self._display_profile()
+            if profile is None:
+                return
+            version = modes.token((modes.state_key(ctx), profile))
+            self._send(200, f"{version}\n".encode(), "text/plain")
+
+        def _display_png(self):
+            ctx = self._display_context()
+            if ctx is None:
+                return
+            profile = self._display_profile()
+            if profile is None:
+                return
+            body = modes.png_bytes(ctx)
+            if profile == "grayscale":
+                page = Image.open(io.BytesIO(body)).convert("L")
+                output = io.BytesIO()
+                page.save(output, format="PNG", optimize=True)
+                body = output.getvalue()
+            self._send_cached(body, "image/png")
 
         def _species(self):
             ctx = self._context(self._edited())
@@ -445,6 +486,8 @@ def make_handler(
             "/collage.png": _page_png,
             "/kindle/frame.png": _kindle_png,
             "/kindle/version": _kindle_version,
+            "/display/frame.png": _display_png,
+            "/display/version": _display_version,
             "/preview.png": _preview_png,
             "/state": _state,
             "/paper.png": _paper,

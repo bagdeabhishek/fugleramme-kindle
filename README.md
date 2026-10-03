@@ -1,11 +1,13 @@
-# Fugleramme Kindle
+# Fugleramme for Kindle and KOReader
 
-Turn a jailbroken Kindle into a low-power, live BirdNET art frame.
+Turn a jailbroken Kindle or a KOReader device such as Kobo Libra Colour into a
+low-power, live BirdNET art frame.
 
 This project extends [Fugleramme](https://github.com/arnegiacomo/fugleramme) with a
-resolution-aware grayscale renderer and a tiny Kindle client. Fugleramme stays on a
-server, where it receives BirdNET-Go detections and composes the artwork. The Kindle
-downloads a new fullscreen image only when the composition changes.
+resolution-aware display renderer, a tiny Kindle shell client, and a portable
+KOReader plugin. Fugleramme stays on a server, where it receives BirdNET-Go
+detections and composes the artwork. The e-reader downloads a new fullscreen image
+only when the composition changes.
 
 The result is intentionally simple on the e-reader: two small HTTP endpoints, a
 POSIX/BusyBox shell script, `curl` or `wget`, and
@@ -21,6 +23,8 @@ KMC/KPM scriptlet launchers.
 
 - `GET /kindle/version?width=W&height=H`: a lightweight content/version token.
 - `GET /kindle/frame.png?width=W&height=H`: an exact-size, 8-bit grayscale PNG.
+- `GET /display/version?width=W&height=H&profile=P`: a portable display token.
+- `GET /display/frame.png?width=W&height=H&profile=P`: grayscale or colour PNG.
 - Server-side validation and caching for arbitrary Kindle resolutions.
 - Download-on-change behavior to reduce Wi-Fi use and flash wear.
 - Atomic downloads that retain the last good frame when the network fails.
@@ -30,6 +34,8 @@ KMC/KPM scriptlet launchers.
 - Optional Wi-Fi cycling, ordinary polling, or RTC suspend/wake.
 - An optional Kindle 5.x UI pause based on KOReader's reversible
   `pillow`/`awesome` handling.
+- Reversible Kindle frontlight control with `keep`, `off`, and `fixed` modes.
+- A KOReader plugin with automatic dimensions and colour-screen detection.
 - Tests for dimensions, grayscale output, version stability, input validation, and
   authentication boundaries.
 
@@ -60,6 +66,11 @@ only checks a token, fetches a PNG when needed, displays it, and waits.
 
 The client is model-independent: its width and height are configuration values rather
 than compiled assumptions.
+
+### KOReader on Kobo or Kindle
+
+- A working KOReader installation with Wi-Fi access to Fugleramme.
+- No FBInk, KUAL, shell launcher, or model-specific resolution is required.
 
 ## Server setup
 
@@ -149,6 +160,8 @@ RTC_DEVICE=""
 
 FBINK="/mnt/us/libkh/bin/fbink"
 FREEZE_KINDLE_UI=0
+FRONTLIGHT_MODE=off
+FRONTLIGHT_LEVEL=5
 ```
 
 Use the LAN URL visible from the Kindle, not `localhost`. Obtain the real display
@@ -169,10 +182,55 @@ fbink -e
 | `SUSPEND_MODE=auto` | Attempts `rtcwake`, then falls back to sleep |
 | `START_DELAY_SECONDS` | Lets KUAL/KMC close before the first framebuffer draw |
 | `FREEZE_KINDLE_UI=1` | Pauses Kindle 5.x UI repainting while the frame runs |
+| `FRONTLIGHT_MODE=keep` | Leaves the existing frontlight unchanged |
+| `FRONTLIGHT_MODE=off` | Turns the light off and restores its old level on exit |
+| `FRONTLIGHT_MODE=fixed` | Uses `FRONTLIGHT_LEVEL` while the frame is open |
 
 Start with `FREEZE_KINDLE_UI=0`. If the image appears briefly and the Home screen
 immediately returns, set it to `1`. `stop.sh` resumes the window manager and status
 layer. A forced Kindle restart is the recovery path if cleanup is interrupted.
+
+The Paperwhite 3 can leave a faint glow when only its power service is set to zero.
+The `off` mode also writes zero to the detected backlight node, matching KOReader's
+handling, and saves both values before changing them. Normal exit and `stop.sh`
+restore the saved values.
+
+## KOReader installation for Kobo and Kindle
+
+Copy the complete plugin directory to KOReader:
+
+```text
+# Kobo
+/mnt/onboard/.adds/koreader/plugins/fugleramme.koplugin/
+
+# Kindle
+/mnt/us/koreader/plugins/fugleramme.koplugin/
+```
+
+For example, with a Kobo mounted at `/media/$USER/KOBOeReader`:
+
+```bash
+mkdir -p "/media/$USER/KOBOeReader/.adds/koreader/plugins"
+cp -R examples/koreader-fugleramme/fugleramme.koplugin \
+  "/media/$USER/KOBOeReader/.adds/koreader/plugins/"
+sync
+```
+
+Safely eject the reader, restart KOReader, then choose:
+
+```text
+Tools > Fugleramme frame > Set server URL
+```
+
+Enter a URL visible from the reader, such as `http://192.168.1.80`, and choose
+**Open frame**. Tap the artwork to check immediately. Hold anywhere, or press Back,
+to return to KOReader. The plugin reads the live screen width and height. On a Kobo
+Libra Colour it automatically requests the `kaleido3` profile; monochrome devices
+request `grayscale`. Failed checks retain the cached frame and appear in KOReader's
+normal log.
+
+The plugin keeps KOReader in control of suspend, Wi-Fi, frontlight, and colour
+rendering. It does not modify Kobo firmware or invoke model-specific shell commands.
 
 ## Starting and stopping
 
@@ -271,7 +329,7 @@ acceptance that corrupted entries may be recovered or discarded.
 Run the server test suite with:
 
 ```bash
-uv run pytest tests/test_server.py
+uv run pytest tests/test_server.py tests/test_kindle_client.py tests/test_koreader_plugin.py
 ```
 
 Run the full project checks with the same commands used by the upstream project and

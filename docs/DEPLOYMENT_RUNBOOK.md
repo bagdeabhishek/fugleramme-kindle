@@ -181,6 +181,8 @@ WIFI_WAIT_SECONDS=30
 SUSPEND_MODE=0
 RTC_DEVICE=""
 FBINK="/mnt/us/libkh/bin/fbink"
+FRONTLIGHT_MODE=off
+FRONTLIGHT_LEVEL=5
 ```
 
 ### Why these values were selected
@@ -195,6 +197,38 @@ FBINK="/mnt/us/libkh/bin/fbink"
 - `SUSPEND_MODE=0` is the safe initial setting. The client waits normally rather
   than attempting a model-specific RTC suspend before that path has been tested.
 - FBInk uses the copy already supplied by the Kindle's jailbreak environment.
+- `FRONTLIGHT_MODE=off` saves the Paperwhite's current power-service and sysfs
+  brightness, turns the LEDs fully off, and restores both values when stopped.
+
+## 5a. KOReader path for Kobo Libra Colour
+
+The repository now also contains a device-independent KOReader plugin:
+
+```text
+examples/koreader-fugleramme/fugleramme.koplugin/
+```
+
+Install it on a Kobo at:
+
+```text
+/mnt/onboard/.adds/koreader/plugins/fugleramme.koplugin/
+```
+
+Restart KOReader, select **Tools > Fugleramme frame > Set server URL**, enter
+`http://192.168.1.80`, and select **Open frame**. It queries KOReader for the actual
+screen dimensions and detects the colour panel, so the Libra Colour does not need a
+hardcoded resolution. KOReader owns Wi-Fi, suspend, and frontlight behavior.
+
+The shared endpoints are:
+
+```text
+GET /display/version?width=<pixels>&height=<pixels>&profile=<profile>
+GET /display/frame.png?width=<pixels>&height=<pixels>&profile=<profile>
+```
+
+Supported profiles are `grayscale`, `color`, and `kaleido3`. The last two preserve
+the server's RGB output; KOReader performs the final device-specific E Ink rendering.
+The original `/kindle/*` routes remain unchanged for the shell client.
 
 ## 6. Refresh cycle
 
