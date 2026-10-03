@@ -39,6 +39,8 @@ from pathlib import Path
 from typing import ClassVar
 from urllib.parse import parse_qs, urlparse
 
+from PIL import Image
+
 from .. import __version__, modes, updates
 from ..languages import namer
 from ..panel import Panel, resolution_of
@@ -55,6 +57,9 @@ REQUEST_TIMEOUT = 15
 
 HTML = "text/html; charset=utf-8"
 JSON = "application/json"
+KINDLE_MIN_SIDE = 320
+KINDLE_MAX_SIDE = 4096
+KINDLE_MAX_PIXELS = 10_000_000
 
 # What a password covers (#52). The kiosk stays open whatever is set: it is the
 # product, and the demo page and the container's healthcheck read it as strangers.
@@ -316,6 +321,37 @@ def make_handler(
                 panel=settings.web_lock and attached is not None,
             )
 
+        def _kindle_context(self) -> modes.Context | None:
+            """The normal page at a Kindle-owned size. The client names both
+            sides because Kindle models and orientations do not share a resolution."""
+            query = self._query()
+            try:
+                width = int(query.get("width", [""])[0])
+                height = int(query.get("height", [""])[0])
+            except ValueError:
+                width = height = 0
+            valid = (
+                KINDLE_MIN_SIDE <= width <= KINDLE_MAX_SIDE
+                and KINDLE_MIN_SIDE <= height <= KINDLE_MAX_SIDE
+                and width * height <= KINDLE_MAX_PIXELS
+            )
+            if not valid:
+                self._send(
+                    400,
+                    b"width and height must be integers from 320 to 4096 (10 MP maximum)",
+                    "text/plain",
+                )
+                return None
+            settings = store.get()
+            return modes.context(
+                source,
+                images_dir,
+                picks,
+                settings,
+                namer(settings.primary_language, settings.secondary_language, store.path.parent),
+                (width, height),
+            )
+
         def _edited(self) -> Settings:
             """Saved settings under the admin's unsaved form state, so the
             preview and its listing show a change before Save."""
@@ -343,6 +379,24 @@ def make_handler(
             # Cheap enough to poll: one grouped query, no render.
             token = modes.token(modes.state_key(self._context(store.get())))
             self._send(200, json.dumps({"token": token}).encode(), JSON)
+
+        def _kindle_version(self):
+            ctx = self._kindle_context()
+            if ctx is None:
+                return
+            version = modes.token(modes.state_key(ctx))
+            self._send(200, f"{version}\n".encode(), "text/plain")
+
+        def _kindle_png(self):
+            ctx = self._kindle_context()
+            if ctx is None:
+                return
+            # Render through the shared page cache, then make the wire image
+            # explicitly grayscale so the old Kindle only has to decode and show it.
+            page = Image.open(io.BytesIO(modes.png_bytes(ctx))).convert("L")
+            output = io.BytesIO()
+            page.save(output, format="PNG", optimize=True)
+            self._send_cached(output.getvalue(), "image/png")
 
         def _species(self):
             ctx = self._context(self._edited())
@@ -389,6 +443,8 @@ def make_handler(
 
         ROUTES: ClassVar[dict] = {
             "/collage.png": _page_png,
+            "/kindle/frame.png": _kindle_png,
+            "/kindle/version": _kindle_version,
             "/preview.png": _preview_png,
             "/state": _state,
             "/paper.png": _paper,

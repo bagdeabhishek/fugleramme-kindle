@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "name": "Fugleramme",
+      "items": [
+        {
+          "name": "Start frame",
+          "action": "/mnt/us/extensions/fugleramme/start.sh",
+          "exitmenu": false
+        },
+        {
+          "name": "Refresh once",
+          "action": "/mnt/us/extensions/fugleramme/refresh.sh",
+          "exitmenu": false
+        },
+        {
+          "name": "Stop frame",
+          "action": "/mnt/us/extensions/fugleramme/stop.sh",
+          "exitmenu": false
+        }
+      ]
+    }
+  ]
+}

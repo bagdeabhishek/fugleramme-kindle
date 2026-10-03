@@ -1,190 +1,284 @@
-# fugleramme
-Bird frame for Raspberry Pi - real-time bird detection by audio, fully local AI, rendered as real, hand-cut 1800s bird illustrations. On an e-ink panel, a TV, or any screen.
+# Fugleramme Kindle
 
-<p align="center">
-  <img src="docs/assets/hero.jpg" width="520"
-       alt="The frame on a kitchen windowsill showing six birds heard in the garden, a window feeder on the glass behind it">
-  <br>
-  <em>Sorry about the dirty window - squirrels have been stealing the bird food.</em>
-</p>
+Turn a jailbroken Kindle into a low-power, live BirdNET art frame.
 
-<p align="center">
-  <a href="https://fugleramme.arnegiacomo.dev"><img src="https://img.shields.io/website?url=https%3A%2F%2Ffugleramme.arnegiacomo.dev&style=flat-square&label=live%20demo&up_message=online&down_message=offline&up_color=brightgreen" alt="Live demo"></a>
-  <a href="https://github.com/arnegiacomo/fugleramme/releases"><img src="https://img.shields.io/github/v/release/arnegiacomo/fugleramme?style=flat-square&color=blue" alt="Latest release"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20%2B%20art%20CC--BY--SA-green?style=flat-square" alt="License: MIT, artwork CC BY-SA 4.0"></a>
-  <a href="https://github.com/sponsors/arnegiacomo"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-ea4aaa?style=flat-square&logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
-  <br>
-  <a href="https://github.com/arnegiacomo/fugleramme/stargazers"><img src="https://img.shields.io/github/stars/arnegiacomo/fugleramme?style=flat-square&color=yellow" alt="Stars"></a>
-  <a href="https://github.com/arnegiacomo/fugleramme/graphs/contributors"><img src="https://img.shields.io/github/contributors/arnegiacomo/fugleramme?style=flat-square&color=orange" alt="Contributors"></a>
-  <a href="#art"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Farnegiacomo.dev%2Ffugleramme%2Fbadges%2Fartwork.json&style=flat-square" alt="Artwork"></a>
-  <a href="#art"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Farnegiacomo.dev%2Ffugleramme%2Fbadges%2Fspecies.json&style=flat-square" alt="Species"></a>
-</p>
+This project extends [Fugleramme](https://github.com/arnegiacomo/fugleramme) with a
+resolution-aware grayscale renderer and a tiny Kindle client. Fugleramme stays on a
+server, where it receives BirdNET-Go detections and composes the artwork. The Kindle
+downloads a new fullscreen image only when the composition changes.
 
-> [!IMPORTANT]
-> Fugleramme has been selected for the [GOSIM Spotlight](https://spotlight.gosim.org/shenzhen2026/) at [GOSIM Shenzhen 2026](https://shenzhen2026.gosim.org/). If you're there, come by and say hi!
+The result is intentionally simple on the e-reader: two small HTTP endpoints, a
+POSIX/BusyBox shell script, `curl` or `wget`, and
+[FBInk](https://github.com/NiLuJe/FBInk). It supports classic KUAL as well as
+KMC/KPM scriptlet launchers.
 
 > [!NOTE]
-> Still in early development: expect the odd bug and a few unpolished edges, with plenty more features to come.
+> This is an independent integration built on Fugleramme. The original project and
+> its documentation are by Arne Giacomo. Its README is preserved at
+> [docs/FUGLERAMME_UPSTREAM_README.md](docs/FUGLERAMME_UPSTREAM_README.md).
 
-Live on **[fugleramme.arnegiacomo.dev](https://fugleramme.arnegiacomo.dev)** running from my kitchen window and displaying the actual birds currently heard in my garden (Bergen, Norway). See other frames from around the world [here](docs/showcase.md)!
+## What it adds
 
-Hardware, install and operations docs: **[arnegiacomo.dev/fugleramme](https://arnegiacomo.dev/fugleramme/)**
+- `GET /kindle/version?width=W&height=H`: a lightweight content/version token.
+- `GET /kindle/frame.png?width=W&height=H`: an exact-size, 8-bit grayscale PNG.
+- Server-side validation and caching for arbitrary Kindle resolutions.
+- Download-on-change behavior to reduce Wi-Fi use and flash wear.
+- Atomic downloads that retain the last good frame when the network fails.
+- Fullscreen rendering with FBInk.
+- KUAL Start, Refresh, and Stop actions.
+- A KMC/KPM home-screen scriptlet.
+- Optional Wi-Fi cycling, ordinary polling, or RTC suspend/wake.
+- An optional Kindle 5.x UI pause based on KOReader's reversible
+  `pillow`/`awesome` handling.
+- Tests for dimensions, grayscale output, version stability, input validation, and
+  authentication boundaries.
 
-## Inspiration
+## Architecture
 
-The look came from a [WWF Verdens naturfond poster by Axel Thorenfeldt](https://www.axelthorenfeldt.com/news/wwf-verdens-naturfonds-fugleskole)
-hanging on my wall, the live-frame idea from Teddy Warner's [AvianVisitors](https://theodore.net/projects/AvianVisitors/) that I saw on Instagram,
-and the detection from [BirdNET-Go](https://github.com/tphakala/birdnet-go) - I wanted a version of that poster showing the actual birds in my garden.
-
-## How it works
-
-[BirdNET-Go](https://github.com/tphakala/birdnet-go) listens on a mic and identifies the
-birds. Fugleramme polls its API, matches each species to an illustration, packs them onto a
-page, and redraws only when the birds change - on an
-[Inky Impression](https://shop.pimoroni.com/discount/ARNE?redirect=/products/inky-impression)
-e-ink panel or any screen. An admin page lets you configure what to show, and the frame
-updates itself.
-
-If you already run BirdNET-Go, point the frame at it instead - on the same machine or anywhere else reachable from your network.
-
-> [!TIP]
-> The e-ink panel is what makes it a picture frame, but it isn't required. Without one, Fugleramme runs web-only
-> and the page takes the shape of whatever shows it - a TV, an HDMI display, any device on the network, or even your
-> desktop wallpaper/screensaver. See [Screens](docs/screens.md).
-
-## Hardware
-
-A Raspberry Pi 5, an [Inky Impression 13.3"](https://shop.pimoroni.com/discount/ARNE?redirect=/products/inky-impression)
-(Spectra 6), a mic and an A4 frame. Full parts list, recommendations and alternatives: **[Hardware](docs/hardware.md)**.
-
-I'm affiliated with Pimoroni - buying through the Pimoroni links or using the code `ARNE` at checkout supports this project.
-
-## Art
-
-Half the point of this project is showing off some amazing public-domain natural-history
-illustrations. Over 1000 cut-outs covering more than 500 species, every one taken from a
-real plate and hand-curated for this project (no art is AI-generated, though some has been
-retouched with AI).
-
-Each detected species is matched to its illustration, background-removed, and packed onto
-a textured paper page with the larger birds toward the centre, sized by body mass. An empty
-window shows a bare perch.
-
-Coverage is best across Europe and northern Asia, good in North America, and thinner in the tropics and the southern hemisphere thus far - however, it's quickly growing!
-
-[Species coverage](https://arnegiacomo.dev/fugleramme/species/) has a searchable list of all currently supported species (pick your location to see which of your local birds are supported). See [Adding artwork](docs/adding-artwork.md) for manual cutout steps.
-
-| No detections | A few visitors | A full garden |
-| :---: | :---: | :---: |
-| ![No birds detected](docs/assets/empty.png) | ![A few garden birds](docs/assets/few.png) | ![Many garden birds](docs/assets/many.png) |
-
-## Install on a Raspberry Pi
-
-From the pi (assuming you have the hardware up and running):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/arnegiacomo/fugleramme/main/install.sh | bash
+```text
+microphone -> BirdNET-Go -> Fugleramme server -> version + grayscale PNG -> Kindle
 ```
 
-Asks where BirdNET-Go should live and which ports to use, clones the repo, installs the required deps, and starts the frame as a systemd service. **NB!** Will probably require a reboot on a fresh system.
+Fugleramme owns detection state, layout, artwork, labels, and rendering. The Kindle
+only checks a token, fetches a PNG when needed, displays it, and waits.
 
-From a blank SD card, see the full [install guide](docs/install.md).
+## Requirements
 
-## Run in a container
+### Server
+
+- A system capable of running Fugleramme (Linux, Raspberry Pi, VM/LXC, or Docker).
+- Python 3.11 or newer when running directly.
+- A reachable BirdNET-Go installation or Fugleramme's supported detector setup.
+
+### Kindle
+
+- A jailbroken Kindle.
+- KUAL or a KMC/KPM-compatible shell scriptlet launcher.
+- FBInk built with image support.
+- `curl` or `wget`.
+- Wi-Fi access to the Fugleramme server.
+
+The client is model-independent: its width and height are configuration values rather
+than compiled assumptions.
+
+## Server setup
+
+Clone the repository and follow Fugleramme's normal installation path. The original
+install, container, hardware, and operations documentation remains available in
+[docs/FUGLERAMME_UPSTREAM_README.md](docs/FUGLERAMME_UPSTREAM_README.md) and the
+rest of the [`docs/`](docs/) directory.
+
+For local development:
 
 ```bash
-docker run -d -p 8080:8080 -v fugleramme:/data \
-  -e FUGLERAMME_DETECTOR_URL=http://birdnet.local:8080 \
-  ghcr.io/arnegiacomo/fugleramme
+uv sync
+uv run fugleramme-fake-detector
+uv run fugleramme-dev
 ```
 
-Kiosk on `:8080`, admin on `:8080/admin`, everything it persists in `/data`.
+The development server listens on port 8080 by default. A production deployment may
+publish it directly or through a reverse proxy on port 80.
 
-On a Linux box with a USB mic, this brings up BirdNET-Go alongside it:
+Verify the Kindle endpoints with a representative screen size:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/arnegiacomo/fugleramme/main/examples/docker-compose.yml -o docker-compose.yml
-docker compose up -d
+curl -fsS \
+  'http://SERVER:8080/kindle/version?width=1072&height=1448'
+
+curl -fsS \
+  -o kindle.png \
+  'http://SERVER:8080/kindle/frame.png?width=1072&height=1448'
+
+file kindle.png
 ```
 
-See **[Container](docs/container.md)** for more info.
+The image should report the requested dimensions and grayscale mode.
 
-## Run locally (for development)
+## Kindle installation
+
+Copy the client directory to USB storage so it appears on the Kindle as:
+
+```text
+/mnt/us/extensions/fugleramme/
+```
+
+From a Linux workstation where the Kindle is mounted at `/media/$USER/Kindle`:
 
 ```bash
-uv sync                                       # set up venv
-uv run fugleramme-fake-detector               # stand-in BirdNET-Go on :8090
-uv run fugleramme-dev                         # start service on :8080 with hot-reload
+mkdir -p "/media/$USER/Kindle/extensions/fugleramme"
+cp examples/kindle-fugleramme/config.sh \
+   examples/kindle-fugleramme/fugleramme.sh \
+   examples/kindle-fugleramme/menu.json \
+   examples/kindle-fugleramme/refresh.sh \
+   examples/kindle-fugleramme/start.sh \
+   examples/kindle-fugleramme/stop.sh \
+   "/media/$USER/Kindle/extensions/fugleramme/"
 ```
 
-The fake detector's flags, and working against a real station instead:
-[Running it without a Pi](CONTRIBUTING.md#running-it-without-a-pi).
+For a KMC/KPM launcher, also copy the document scriptlet:
 
-## Contributing
+```bash
+cp examples/kindle-fugleramme/Fugleramme.sh \
+   "/media/$USER/Kindle/documents/Fugleramme.sh"
+sync
+```
 
-Contributions are very welcome and encouraged - fixes, docs and artwork most of all. Thanks to
-[everyone who has contributed](https://github.com/arnegiacomo/fugleramme/graphs/contributors)
-and [sponsored](https://github.com/sponsors/arnegiacomo) so far ❤️
+Safely unmount the Kindle before removing the cable.
 
-<a href="https://github.com/arnegiacomo/fugleramme/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=arnegiacomo/fugleramme" alt="Contributors">
-</a>
+## Configuration
 
-Want to help?
+Edit `/mnt/us/extensions/fugleramme/config.sh`:
 
-- **Something is broken** - a [bug report](https://github.com/arnegiacomo/fugleramme/issues/new/choose)
-- **A question, an idea, or a frame you have built** - the
-  [FAQ](https://arnegiacomo.dev/fugleramme/faq/) first, then
-  [Discussions](https://github.com/arnegiacomo/fugleramme/discussions)
-- **A fix, a doc change, or a bird you have cut** - open a PR, no issue needed
-- **Don't know where to start** - the [good first issues](https://github.com/arnegiacomo/fugleramme/labels/good%20first%20issue)
+```sh
+FUGLERAMME_URL="http://fugleramme.local:8080"
+KINDLE_WIDTH=1072
+KINDLE_HEIGHT=1448
 
-See **[Contributing](CONTRIBUTING.md)** for more info.
+INTERVAL_SECONDS=300
+START_DELAY_SECONDS=5
 
-## Similar projects
+MANAGE_WIFI=1
+WIFI_WAIT_SECONDS=30
 
-- [AvianVisitors](https://github.com/Twarner491/AvianVisitors) - BirdNET-Pi, AI-generated illustrations and photo cutouts, also sold as [kits](https://theodore.net/store/)
-- [inky-bird-frame](https://github.com/veteranbv/inky-bird-frame) - BirdNET, field-journal illustrations on an Inky panel
-- [HABirdDashboard](https://github.com/adamoberley/HABirdDashboard) - BirdNET-Go, a collage card for Home Assistant
-- [belkins-birdnet](https://github.com/Belkins/belkins-birdnet) - BirdNET-Pi, AI-generated kachō-e style illustrations
-- [featherframe](https://github.com/wr/featherframe) - BirdNET-Pi, Audubon plates on an ESP32 e-ink panel
-- [birdframe](https://github.com/simenf/birdframe) - BirdNET-Go, several art styles on a Samsung Frame TV
-- [Plate197](https://github.com/kevinl95/Plate197) - BirdNET, Audubon plates on a Raspberry Pi touchscreen
+SUSPEND_MODE=0
+RTC_DEVICE=""
 
-Fugleramme shares no code or art with them.
+FBINK="/mnt/us/libkh/bin/fbink"
+FREEZE_KINDLE_UI=0
+```
 
-## Built on fugleramme
+Use the LAN URL visible from the Kindle, not `localhost`. Obtain the real display
+geometry over SSH with:
 
-- [fugleramme-samsung-frame](https://github.com/conradj/fugleramme-samsung-frame) - sends the collage to a Samsung Frame TV in Art Mode
-- [birdnet-frame](https://github.com/icecoldfire/birdnet-frame) - a Docker container that sends the collage to a Samsung Frame TV in Art Mode
-- [birdnet_eink](https://github.com/Sidiox/birdnet_eink) - the artwork on a LilyGO T5 4.7" ESP32 e-ink display
-- [birdframe](https://github.com/ben-gy/birdframe) - the collage in greyscale on a QuirkLogic Papyr 13.3" e-ink tablet
-- [Cobalt Birds](https://github.com/BandarLabs/Cobalt/tree/main/apps/birds) - the collage on a Kobo e-reader running Cobalt
+```sh
+fbink -e
+```
 
-## License
+### Important options
 
-- Code: MIT - see [`LICENSE`](LICENSE).
-- Detection ([BirdNET-Go](https://github.com/tphakala/birdnet-go), installed
-  separately as a container): CC BY-NC-SA 4.0, non-commercial only. BirdNET model
-  by the Cornell Lab of Ornithology and Chemnitz University of Technology,
-  taxonomy data powered by eBird.org.
-- Bird images: each style folder carries its own terms and sources, and its
-  manifest links the plate every file was cut from. `classic` is
-  CC BY-SA 4.0 - see
-  [`assets/artwork/classic/ATTRIBUTION.md`](assets/artwork/classic/ATTRIBUTION.md).
-- Label fonts (`assets/fonts/`): SIL OFL 1.1 - see
-  [`assets/fonts/ATTRIBUTION.md`](assets/fonts/ATTRIBUTION.md).
-- Bird sizes (`assets/bird_sizes.csv`): body mass from AVONET (Tobias et al.
-  2022, Ecology Letters, [doi:10.1111/ele.13898](https://doi.org/10.1111/ele.13898)),
-  CC BY 4.0.
-- BirdNET scientific-name aliases (`assets/birdnet_aliases.json`):
-  [OpenFauna](https://github.com/tphakala/openfauna)'s compiled taxonomic alias
-  map, CC BY-SA 4.0 - see [`assets/ATTRIBUTION.md`](assets/ATTRIBUTION.md).
-- Docs search (`docs/assets/fuse.min.js`): [Fuse.js](https://www.fusejs.io/) by
-  Kiro Risk, Apache 2.0.
+| Option | Meaning |
+|---|---|
+| `INTERVAL_SECONDS` | Time between checks; defaults to five minutes |
+| `MANAGE_WIFI=1` | Enables Wi-Fi for a check and disables it afterward |
+| `MANAGE_WIFI=0` | Leaves Wi-Fi continuously under the Kindle's control |
+| `SUSPEND_MODE=0` | Uses ordinary sleep; recommended while testing |
+| `SUSPEND_MODE=auto` | Attempts `rtcwake`, then falls back to sleep |
+| `START_DELAY_SECONDS` | Lets KUAL/KMC close before the first framebuffer draw |
+| `FREEZE_KINDLE_UI=1` | Pauses Kindle 5.x UI repainting while the frame runs |
 
-## Contact
+Start with `FREEZE_KINDLE_UI=0`. If the image appears briefly and the Home screen
+immediately returns, set it to `1`. `stop.sh` resumes the window manager and status
+layer. A forced Kindle restart is the recovery path if cleanup is interrupted.
 
-Questions and ideas about the project belong in
-[Discussions](https://github.com/arnegiacomo/fugleramme/discussions). For anything
-else, you can reach me through [arnegiacomo.dev](https://arnegiacomo.dev/).
+## Starting and stopping
+
+With KUAL, choose:
+
+```text
+Fugleramme -> Start frame
+Fugleramme -> Refresh once
+Fugleramme -> Stop frame
+```
+
+With KMC/KPM, open the **Fugleramme** document from the Kindle library.
+
+From SSH:
+
+```sh
+/bin/sh /mnt/us/extensions/fugleramme/start.sh
+/bin/sh /mnt/us/extensions/fugleramme/refresh.sh
+/bin/sh /mnt/us/extensions/fugleramme/stop.sh
+```
+
+Runtime data and logs are stored under:
+
+```text
+/mnt/us/extensions/fugleramme/state/
+```
+
+Force the next cycle to redraw by clearing the cached token:
+
+```sh
+: > /mnt/us/extensions/fugleramme/state/version
+```
+
+## How each refresh works
+
+1. Bring Wi-Fi up when configured to manage it.
+2. Request the small version token.
+3. Stop if the token is unchanged and a cached image exists.
+4. Download a changed frame to a temporary file.
+5. Replace the cache only after a successful, non-empty download.
+6. Draw fullscreen through FBInk.
+7. Save the version only after FBInk succeeds.
+8. Turn Wi-Fi off when configured and wait for the next cycle.
+
+Failures keep the last successfully rendered artwork on the e-ink display.
+
+## Troubleshooting
+
+### The image flashes, then Home returns
+
+Set:
+
+```sh
+FREEZE_KINDLE_UI=1
+```
+
+Some Kindle 5.x releases keep repainting the native `awesome` window manager over
+direct framebuffer applications. This mode temporarily pauses it and disables the
+`pillow` UI layer, using the same mechanism as KOReader on affected firmware.
+
+### Wi-Fi repeatedly disconnects
+
+This is expected with `MANAGE_WIFI=1`. Set `MANAGE_WIFI=0` to keep the connection up,
+at the cost of additional battery use.
+
+### Nothing updates
+
+Inspect the client log:
+
+```sh
+tail -n 100 /mnt/us/extensions/fugleramme/state/fugleramme.log
+```
+
+Then confirm the Kindle can reach the server URL and that the configured resolution is
+numeric.
+
+### The USB volume mounts read-only
+
+Stop and inspect the cable, kernel log, and filesystem state. Always unmount before
+disconnecting. Do not run an automatic filesystem repair without a backup and explicit
+acceptance that corrupted entries may be recovered or discarded.
+
+## Tests
+
+Run the server test suite with:
+
+```bash
+uv run pytest tests/test_server.py
+```
+
+Run the full project checks with the same commands used by the upstream project and
+its CI configuration.
+
+## Documentation
+
+- [Detailed deployment and recovery runbook](docs/DEPLOYMENT_RUNBOOK.md)
+- [Kindle and other screen options](docs/screens.md)
+- [Original Fugleramme README](docs/FUGLERAMME_UPSTREAM_README.md)
+- [Upstream Fugleramme project](https://github.com/arnegiacomo/fugleramme)
+- [FBInk](https://github.com/NiLuJe/FBInk)
+
+## Attribution and license
+
+Fugleramme and its application code are copyright their respective contributors and
+licensed under the MIT License; see [LICENSE](LICENSE). The bird artwork, fonts,
+BirdNET components, and datasets have their own attribution and licensing terms as
+documented by the upstream project in
+[docs/FUGLERAMME_UPSTREAM_README.md](docs/FUGLERAMME_UPSTREAM_README.md) and the
+asset attribution files.
+
+The Kindle integration changes in this repository are provided under the same MIT
+license for code. Retain all upstream copyright, license, and artwork attribution when
+redistributing the combined project.

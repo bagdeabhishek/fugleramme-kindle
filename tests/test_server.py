@@ -187,6 +187,33 @@ def test_an_unchanged_page_revalidates_to_304(frame):
         assert status == 304 and body == b""
 
 
+def test_the_kindle_gets_an_exact_grayscale_page_and_a_lightweight_version(frame):
+    query = "?width=600&height=800"
+    status, headers, body = _fetch(frame + "/kindle/frame.png" + query)
+    image = Image.open(io.BytesIO(body))
+
+    assert status == 200
+    assert headers["Content-Type"] == "image/png"
+    assert image.size == (600, 800)
+    assert image.mode == "L"
+
+    version = _fetch(frame + "/kindle/version" + query)[2]
+    assert re.fullmatch(rb"[0-9a-f]{16}\n", version)
+    assert version == _fetch(frame + "/kindle/version" + query)[2]
+    assert version != _fetch(frame + "/kindle/version?width=800&height=600")[2]
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["", "?width=nope&height=800", "?width=319&height=800", "?width=4096&height=4096"],
+)
+def test_the_kindle_routes_refuse_an_unsafe_or_incomplete_size(frame, query):
+    for route in ("/kindle/frame.png", "/kindle/version"):
+        status, _headers, body = _fetch(frame + route + query)
+        assert status == 400
+        assert b"width and height" in body
+
+
 def test_the_preview_reads_an_unsaved_form_without_saving_it(frame, tmp_path):
     saved = json.loads(_fetch(frame + "/species")[2])
     edited = json.loads(_fetch(frame + "/species?mode=latest")[2])
@@ -320,6 +347,8 @@ def test_every_route_is_either_the_kiosk_or_behind_the_password(tmp_path, source
         "/admin.css",
         "/admin.js",
         "/collage.png",
+        "/kindle/frame.png",
+        "/kindle/version",
         "/state",
         "/paper.png",
         "/health",
@@ -343,6 +372,7 @@ def test_a_password_leaves_the_kiosk_open(locked):
     """The kiosk is the product: a password must not shut strangers out of the birds."""
     for route in ("/", "/collage.png", "/state", "/paper.png", "/admin.css", "/health"):
         assert _fetch(locked + route)[0] == 200
+    assert _fetch(locked + "/kindle/version?width=600&height=800")[0] == 200
 
 
 def test_signing_in_opens_the_admin_and_signing_out_shuts_it(locked):

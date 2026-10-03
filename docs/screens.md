@@ -8,6 +8,75 @@ panel. Five ways, easiest first.
 Open `http://<host>.local:8080/` on a phone, tablet or laptop on the same
 network. This will work on any Raspberry pi os and installation method.
 
+## On a jailbroken Kindle
+
+A jailbroken Kindle can be a low-power grayscale Fugleramme frame. Fugleramme
+does the rendering. The Kindle checks a small version endpoint, downloads a new
+PNG only when the page changes, shows it with FBInk, and sleeps between checks.
+
+You need KUAL or a KMC/KPM scriptlet launcher, and an FBInk build with image
+support installed on the Kindle.
+Copy [`examples/kindle-fugleramme`](https://github.com/arnegiacomo/fugleramme/tree/main/examples/kindle-fugleramme)
+to the Kindle over USB so it ends up at:
+
+```text
+/mnt/us/extensions/fugleramme/
+```
+
+Over SSH, ask FBInk for the display details:
+
+```bash
+fbink -e
+```
+
+Edit `/mnt/us/extensions/fugleramme/config.sh`. Set `FUGLERAMME_URL` to the
+Fugleramme server's LAN address, and set `KINDLE_WIDTH` and `KINDLE_HEIGHT` to
+the visible size reported by FBInk in the orientation you want to use. For
+example:
+
+```sh
+FUGLERAMME_URL="http://192.168.1.20:8080"
+KINDLE_WIDTH=1072
+KINDLE_HEIGHT=1448
+```
+
+The server can be checked from another machine before starting the Kindle:
+
+```bash
+curl "http://192.168.1.20:8080/kindle/version?width=1072&height=1448"
+curl -o kindle.png "http://192.168.1.20:8080/kindle/frame.png?width=1072&height=1448"
+```
+
+Make the launchers executable, disconnect USB storage, open KUAL, and choose
+**Fugleramme > Start frame**:
+
+```bash
+chmod +x /mnt/us/extensions/fugleramme/*.sh
+```
+
+On KMC/KPM-based jailbreaks, also copy `Fugleramme.sh` to
+`/mnt/us/documents/Fugleramme.sh`. After disconnecting USB and refreshing the
+library, launch the **Fugleramme** document from the Kindle home screen.
+
+The default interval is five minutes. Wi-Fi is enabled only for each check.
+The launcher waits five seconds before the first draw so the Kindle home screen
+cannot immediately paint over it; tune `START_DELAY_SECONDS` if a launcher on a
+particular firmware closes more slowly.
+If the stock Kindle interface still paints over the image, set
+`FREEZE_KINDLE_UI=1`. This uses the same reversible window-manager pause as
+KOReader. **Stop frame** resumes the UI; a forced Kindle restart also restores
+it if the client is interrupted unexpectedly.
+The script uses `rtcwake` and `/dev/rtc1` when they are available, then falls
+back to an ordinary sleep if suspend is unavailable. Kindle RTC devices vary by
+model. Test first with `SUSPEND_MODE=0`; once fetching and FBInk work, change it
+to `auto`. Set `RTC_DEVICE=/dev/rtc0` in `config.sh` if that is the working RTC
+on your model.
+
+**Stop frame** restores the normal screensaver and leaves the last picture on
+the display. Logs, the cached frame and the last version are under
+`/mnt/us/extensions/fugleramme/state/`. Delete `state/version` to force the next
+check to download and redraw the page.
+
 ## On HDMI, Raspberry Pi OS Desktop
 
 The desktop OS already has a browser and a session to run it in:
