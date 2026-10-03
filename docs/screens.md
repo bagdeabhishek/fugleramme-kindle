@@ -75,6 +75,12 @@ the extension folder: Kindle storage is case-insensitive and it would
 overwrite the `fugleramme.sh` client. After disconnecting USB and refreshing
 the library, launch the **Fugleramme** document from the Kindle home screen.
 
+Press the physical power button once to leave the frame. With
+`POWER_BUTTON_EXITS=1`, the client listens for the Kindle power event and uses its
+normal cleanup path, restoring the UI and frontlight before returning Home. A magnetic
+cover may trigger the same exit. KUAL's **Stop frame** and the SSH stop script remain
+available as alternatives.
+
 The default interval is five minutes. Wi-Fi is enabled only for each check.
 The launcher waits five seconds before the first draw so the Kindle home screen
 cannot immediately paint over it; tune `START_DELAY_SECONDS` if a launcher on a

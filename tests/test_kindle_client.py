@@ -33,3 +33,14 @@ def test_frontlight_changes_are_saved_and_restored():
     assert "restore_frontlight" in client
     assert "frontlight.lipc" in stop
     assert "frontlight.sysfs" in stop
+
+
+def test_power_button_has_a_graceful_exit_watcher():
+    client = (CLIENT / "fugleramme.sh").read_text()
+    watcher = (CLIENT / "power-exit.sh").read_text()
+
+    assert "POWER_BUTTON_EXITS=${POWER_BUTTON_EXITS:-1}" in client
+    assert "start_power_exit_watcher" in client
+    assert "wake_after_power_exit" in client
+    assert "lipc-wait-event -m com.lab126.powerd goingToScreenSaver" in watcher
+    assert 'kill -TERM "$CLIENT_PID"' in watcher

@@ -19,11 +19,13 @@ SUSPEND_MODE=${SUSPEND_MODE:-auto}
 RTC_DEVICE=${RTC_DEVICE:-}
 FBINK=${FBINK:-}
 FREEZE_KINDLE_UI=${FREEZE_KINDLE_UI:-0}
+POWER_BUTTON_EXITS=${POWER_BUTTON_EXITS:-1}
 FRONTLIGHT_MODE=${FRONTLIGHT_MODE:-keep}
 FRONTLIGHT_LEVEL=${FRONTLIGHT_LEVEL:-5}
 FRONTLIGHT_SYSFS=${FRONTLIGHT_SYSFS:-}
 UI_FROZEN=0
 FRONTLIGHT_CHANGED=0
+POWER_EXIT_PID=""
 
 STATE="$DIR/state"
 RUNTIME=${FUGLERAMME_RUNTIME:-$STATE}
@@ -283,12 +285,40 @@ restore_frontlight() {
     log "Restored the previous frontlight setting"
 }
 
+start_power_exit_watcher() {
+    [ "$POWER_BUTTON_EXITS" = 1 ] || return 0
+    if [ ! -x "$DIR/power-exit.sh" ] || ! command -v lipc-wait-event >/dev/null 2>&1; then
+        log "Power-button exit is unavailable"
+        return 0
+    fi
+    "$DIR/power-exit.sh" "$$" "$RUNTIME" &
+    POWER_EXIT_PID=$!
+    log "Power-button exit watcher started as PID $POWER_EXIT_PID"
+}
+
+stop_power_exit_watcher() {
+    [ -n "$POWER_EXIT_PID" ] || return 0
+    kill "$POWER_EXIT_PID" 2>/dev/null || true
+    POWER_EXIT_PID=""
+}
+
+wake_after_power_exit() {
+    [ -e "$RUNTIME/power-exit" ] || return 0
+    rm -f "$RUNTIME/power-exit"
+    if command -v lipc-set-prop >/dev/null 2>&1; then
+        lipc-set-prop -i com.lab126.powerd wakeUp 1 >/dev/null 2>&1 || true
+    fi
+    log "Power button requested exit; returning to Kindle Home"
+}
+
 cleanup() {
     status=$?
     trap - EXIT
     log "Stopping with status $status ($STOP_REASON)"
+    stop_power_exit_watcher
     wifi_on
     restore_frontlight
+    wake_after_power_exit
     restore_kindle_ui
     command -v lipc-set-prop >/dev/null 2>&1 && \
         lipc-set-prop com.lab126.powerd preventScreenSaver 0 >/dev/null 2>&1 || true
@@ -323,6 +353,7 @@ else
 fi
 freeze_kindle_ui
 set_frontlight
+start_power_exit_watcher
 
 while :; do
     wifi_on

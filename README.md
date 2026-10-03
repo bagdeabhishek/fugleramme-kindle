@@ -35,6 +35,7 @@ KMC/KPM scriptlet launchers.
 - An optional Kindle 5.x UI pause based on KOReader's reversible
   `pillow`/`awesome` handling.
 - Reversible Kindle frontlight control with `keep`, `off`, and `fixed` modes.
+- A physical power-button exit that restores the Kindle UI and returns Home.
 - A KOReader plugin with automatic dimensions and colour-screen detection.
 - Tests for dimensions, grayscale output, version stability, input validation, and
   authentication boundaries.
@@ -120,6 +121,7 @@ mkdir -p "/media/$USER/Kindle/extensions/fugleramme"
 cp examples/kindle-fugleramme/config.sh \
    examples/kindle-fugleramme/fugleramme.sh \
    examples/kindle-fugleramme/menu.json \
+   examples/kindle-fugleramme/power-exit.sh \
    examples/kindle-fugleramme/refresh.sh \
    examples/kindle-fugleramme/start.sh \
    examples/kindle-fugleramme/stop.sh \
@@ -160,6 +162,7 @@ RTC_DEVICE=""
 
 FBINK="/mnt/us/libkh/bin/fbink"
 FREEZE_KINDLE_UI=0
+POWER_BUTTON_EXITS=1
 FRONTLIGHT_MODE=off
 FRONTLIGHT_LEVEL=5
 ```
@@ -182,6 +185,7 @@ fbink -e
 | `SUSPEND_MODE=auto` | Attempts `rtcwake`, then falls back to sleep |
 | `START_DELAY_SECONDS` | Lets KUAL/KMC close before the first framebuffer draw |
 | `FREEZE_KINDLE_UI=1` | Pauses Kindle 5.x UI repainting while the frame runs |
+| `POWER_BUTTON_EXITS=1` | Exits safely on a physical power-button press |
 | `FRONTLIGHT_MODE=keep` | Leaves the existing frontlight unchanged |
 | `FRONTLIGHT_MODE=off` | Turns the light off and restores its old level on exit |
 | `FRONTLIGHT_MODE=fixed` | Uses `FRONTLIGHT_LEVEL` while the frame is open |
@@ -243,6 +247,12 @@ Fugleramme -> Stop frame
 ```
 
 With KMC/KPM, open the **Fugleramme** document from the Kindle library.
+
+While the frame is open, press the physical power button once to exit. The helper
+observes Kindle powerd's `goingToScreenSaver` event, terminates the client normally,
+restores the frontlight and native UI, wakes the display, and returns Home. Closing a
+magnetic cover can emit the same event and therefore also exits. Set
+`POWER_BUTTON_EXITS=0` only if the power button should retain its stock sleep action.
 
 From SSH:
 

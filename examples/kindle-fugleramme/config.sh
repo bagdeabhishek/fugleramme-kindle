@@ -19,6 +19,10 @@ START_DELAY_SECONDS=${START_DELAY_SECONDS:-5}
 # 1 to pause that UI while Fugleramme runs; stop.sh restores it.
 FREEZE_KINDLE_UI=${FREEZE_KINDLE_UI:-0}
 
+# 1 makes a physical power-button press exit the frame and return to Kindle
+# Home. This remains available even while FREEZE_KINDLE_UI pauses the native UI.
+POWER_BUTTON_EXITS=${POWER_BUTTON_EXITS:-1}
+
 # keep leaves the existing light alone. off saves the current setting and turns
 # the LEDs off while the frame runs. fixed uses FRONTLIGHT_LEVEL (0 to 24 on
 # many Kindles). Stop and normal client exit restore the saved setting.

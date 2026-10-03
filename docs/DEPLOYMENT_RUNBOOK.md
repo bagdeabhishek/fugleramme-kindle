@@ -130,6 +130,7 @@ It contains:
 |---|---|
 | `config.sh` | Device URL, resolution, timing, Wi-Fi and power settings |
 | `fugleramme.sh` | Main POSIX/BusyBox polling and rendering loop |
+| `power-exit.sh` | Converts a physical power-button event into a clean exit |
 | `start.sh` | Starts one background client and records its PID |
 | `refresh.sh` | Performs one immediate check and draw |
 | `stop.sh` | Stops the client and restores the Kindle UI |
@@ -176,6 +177,7 @@ KINDLE_HEIGHT=1448
 INTERVAL_SECONDS=300
 START_DELAY_SECONDS=5
 FREEZE_KINDLE_UI=1
+POWER_BUTTON_EXITS=1
 MANAGE_WIFI=1
 WIFI_WAIT_SECONDS=30
 SUSPEND_MODE=0
@@ -194,6 +196,8 @@ FRONTLIGHT_LEVEL=5
 - `FREEZE_KINDLE_UI=1` is required on this firmware because the native `awesome`
   window manager otherwise repaints the home screen over FBInk. The behavior is
   based on the already-working KOReader wrapper installed on the same Kindle.
+- `POWER_BUTTON_EXITS=1` provides an escape while that native UI is paused. One
+  physical power-button press restores the client-owned state and returns Home.
 - `SUSPEND_MODE=0` is the safe initial setting. The client waits normally rather
   than attempting a model-specific RTC suspend before that path has been tested.
 - FBInk uses the copy already supplied by the Kindle's jailbreak environment.
