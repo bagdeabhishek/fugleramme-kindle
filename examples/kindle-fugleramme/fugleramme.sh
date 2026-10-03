@@ -26,6 +26,7 @@ FRONTLIGHT_SYSFS=${FRONTLIGHT_SYSFS:-}
 UI_FROZEN=0
 FRONTLIGHT_CHANGED=0
 POWER_EXIT_PID=""
+FIRST_REFRESH=1
 
 STATE="$DIR/state"
 RUNTIME=${FUGLERAMME_RUNTIME:-$STATE}
@@ -136,6 +137,15 @@ refresh() {
     current=""
     [ -r "$VERSION" ] && current=$(cat "$VERSION")
     if [ "$remote" = "$current" ] && [ -s "$FRAME" ]; then
+        if [ "$FIRST_REFRESH" = 1 ]; then
+            if "$FBINK" -q -c -f -i "$FRAME" >> "$LOG" 2>&1; then
+                FIRST_REFRESH=0
+                log "Redisplayed cached frame $remote on startup"
+                return 0
+            fi
+            log "FBInk could not redisplay the cached frame on startup"
+            return 1
+        fi
         log "Frame unchanged at $remote"
         return 0
     fi
@@ -153,6 +163,7 @@ refresh() {
     mv "$frame_tmp" "$FRAME"
     if "$FBINK" -q -c -f -i "$FRAME" >> "$LOG" 2>&1; then
         printf '%s\n' "$remote" > "$VERSION"
+        FIRST_REFRESH=0
         log "Displayed frame $remote"
         return 0
     fi

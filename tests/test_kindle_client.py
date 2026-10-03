@@ -44,3 +44,12 @@ def test_power_button_has_a_graceful_exit_watcher():
     assert "wake_after_power_exit" in client
     assert "lipc-wait-event -m com.lab126.powerd goingToScreenSaver" in watcher
     assert 'kill -TERM "$CLIENT_PID"' in watcher
+
+
+def test_each_launch_repaints_an_unchanged_cached_frame_once():
+    client = (CLIENT / "fugleramme.sh").read_text()
+
+    assert "FIRST_REFRESH=1" in client
+    assert 'if [ "$FIRST_REFRESH" = 1 ]; then' in client
+    assert "Redisplayed cached frame" in client
+    assert "FIRST_REFRESH=0" in client
