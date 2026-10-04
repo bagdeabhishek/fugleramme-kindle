@@ -41,6 +41,14 @@ Read the area's breadcrumb before changing it. Each records a constraint the cod
 - Answer the question that was asked, not adjacent ones
 - No trailing "here's what I did" summaries - the diff says it
 
+## Kobo storage safety
+
+- Never edit `.kobo/Kobo/Kobo eReader.conf` or add `ExcludeSyncFolders` as part of a Kobo install. A malformed or re-serialized regular expression can make Nickel remove library records and sideloaded files.
+- Put managed KOReader installs in `.kobo/koreader`, which Nickel already ignores, instead of changing Nickel's scanner configuration for `.adds/koreader`.
+- Before the first Kobo write, copy `.kobo/KoboReader.sqlite`, `.kobo/Kobo/Kobo eReader.conf`, `metadata.calibre`, and `.kobo/version` to storage outside the reader. Hash the configuration before and after the install.
+- Never run repair tools or restore unverified recovered files directly on a reader. Image the filesystem first, recover into a different filesystem, validate archives, and restore only known-good files.
+- Finish every device write with `sync` and a clean unmount. A USB disconnect during a database or library write is a data-loss event, not a harmless retry.
+
 ## Code style
 
 Existing conventions in a file take precedence over these when they differ.

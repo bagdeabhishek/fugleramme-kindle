@@ -42,6 +42,7 @@ nav:
     - Hardware: hardware.md
     - Install: install.md
     - Container: container.md
+    - Kobo installation safety: kobo-safety.md
     - Configuring BirdNET-Go: birdnetgo-config.md
   - Using it:
     - Display: display.md

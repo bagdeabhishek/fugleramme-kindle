@@ -201,17 +201,37 @@ restore the saved values.
 
 ## KOReader installation for Kobo and Kindle
 
-Copy the complete plugin directory to KOReader:
+For a new Kobo install, use the guarded installer. It backs up the Kobo metadata
+to the host, installs KOReader in Nickel's already-ignored `.kobo` directory, and
+checks that `Kobo eReader.conf` remains byte-for-byte unchanged:
+
+```bash
+examples/koreader-fugleramme/install-kobo.sh \
+  "/media/$USER/KOBOeReader" \
+  ~/Downloads/koreader-kobo.zip \
+  ~/Downloads/KoboRoot.tgz \
+  http://fugleramme.local
+```
+
+Do not add or rewrite `ExcludeSyncFolders` for this installation. See
+[Kobo installation safety](docs/kobo-safety.md) before making manual changes.
+
+If KOReader is already installed, copy the complete plugin directory to its
+existing plugin directory:
 
 ```text
-# Kobo
+# Kobo, standard KOReader install
 /mnt/onboard/.adds/koreader/plugins/fugleramme.koplugin/
+
+# Kobo, guarded installer from this repository
+/mnt/onboard/.kobo/koreader/plugins/fugleramme.koplugin/
 
 # Kindle
 /mnt/us/koreader/plugins/fugleramme.koplugin/
 ```
 
-For example, with a Kobo mounted at `/media/$USER/KOBOeReader`:
+For example, with an existing standard Kobo installation mounted at
+`/media/$USER/KOBOeReader`:
 
 ```bash
 mkdir -p "/media/$USER/KOBOeReader/.adds/koreader/plugins"

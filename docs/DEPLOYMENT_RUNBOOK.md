@@ -215,8 +215,14 @@ examples/koreader-fugleramme/fugleramme.koplugin/
 Install it on a Kobo at:
 
 ```text
-/mnt/onboard/.adds/koreader/plugins/fugleramme.koplugin/
+/mnt/onboard/.kobo/koreader/plugins/fugleramme.koplugin/
 ```
+
+This deployment keeps the complete managed KOReader tree below `.kobo/koreader`
+and launches it through NickelMenu. Nickel already ignores `.kobo`, so the install
+must not add or rewrite `ExcludeSyncFolders`. Use the guarded installer described
+in [Kobo installation safety](kobo-safety.md); it takes host-side metadata backups
+and proves that `Kobo eReader.conf` did not change.
 
 Restart KOReader, select **Tools > Fugleramme frame > Set server URL**, enter
 `http://192.168.1.80`, and select **Open frame**. It queries KOReader for the actual
